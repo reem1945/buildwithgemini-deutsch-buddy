@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeutschBuddy - Dein KI-Deutschlehrer</title>
+<!-- Optional: used only to draw A2UI Icon components. If it can't load (offline/
+     corp network), icons fall back to showing their name as text. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
+<style>
+  :root {
+    --accent: #d97706;
+    --accent-dark: #b45309;
+    --accent-light: #fef3c7;
+    --bavarian-blue: #0284c7;
+    --bavarian-light: #e0f2fe;
+    --german-red: #dc2626;
+    --german-gold: #f59e0b;
+    --bg-grad: linear-gradient(180deg, #f0f7ff 0%, #fefce8 50%, #fdf4ff 100%);
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --border: #e2e8f0;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg-grad); display:flex; flex-direction:column; height:100vh; }
+  
+  /* Bavarian decorative top ribbon */
+  .bavarian-ribbon {
+    height: 8px;
+    background: repeating-linear-gradient(45deg, #0284c7, #0284c7 10px, #ffffff 10px, #ffffff 20px);
+    width: 100%;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #1e293b 40%, #0369a1 80%, #d97706 100%);
+    color:#fff;
+    padding: 0.9rem 1.4rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+  }
+  .logo-title { font-size:1.35rem; display:flex; align-items:center; gap:0.6rem; letter-spacing:0.02em; text-shadow:0 1px 2px rgba(0,0,0,0.3); }
+  .logo-tagline { font-size:0.85rem; color:#fef08a; font-weight:600; background:rgba(255,255,255,0.15); padding:4px 10px; border-radius:20px; backdrop-filter:blur(4px); }
+  
+  #log { flex:1; overflow-y:auto; padding:1.2rem; max-width:820px; width:100%; margin:0 auto; }
+  
+  /* Dialogue bubbles */
+  .msg-row { display:flex; gap:0.75rem; align-items:flex-start; margin:1rem 0; animation:fadeIn 0.25s ease-in; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+  .msg-row.user { flex-direction:row-reverse; }
+  
+  .avatar {
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.35rem;
+    background:linear-gradient(135deg, #fef08a, #fed7aa);
+    border:2px solid #f59e0b;
+    flex-shrink:0;
+    box-shadow:0 3px 8px rgba(245, 158, 11, 0.25);
+  }
+  .msg-row.user .avatar {
+    background:linear-gradient(135deg, #0ea5e9, #0284c7);
+    border-color:#38bdf8;
+    color:#fff;
+    box-shadow:0 3px 8px rgba(2, 132, 199, 0.3);
+  }
+
+  .bubble {
+    display:inline-block;
+    padding:0.85rem 1.15rem;
+    border-radius:16px;
+    background:#ffffff;
+    border:1px solid #e2e8f0;
+    text-align:left;
+    max-width:85%;
+    white-space:pre-wrap;
+    box-shadow:0 3px 10px rgba(0, 0, 0, 0.04);
+    line-height:1.5;
+    color:#1e293b;
+  }
+  .msg-row.bot .bubble { border-left:4px solid #0284c7; background:linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); }
+  .msg-row.user .bubble {
+    background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color:#ffffff;
+    border:none;
+    box-shadow:0 4px 12px rgba(2, 132, 199, 0.25);
+  }
+  
+  /* When the reply is an A2UI card, drop the bubble chrome */
+  .bubble.rich { background:transparent; border:none; padding:0; max-width:100%; white-space:normal; box-shadow:none; }
+
+  /* Quick Prompts with colorful badges */
+  .quick-prompts {
+    display:flex;
+    gap:0.6rem;
+    padding:0.65rem 1.2rem;
+    overflow-x:auto;
+    background:linear-gradient(90deg, #f8fafc 0%, #eff6ff 50%, #fefce8 100%);
+    border-top:1px solid var(--border);
+    scrollbar-width:thin;
+  }
+  .prompt-chip {
+    white-space:nowrap;
+    background:#ffffff;
+    border:1.5px solid #cbd5e1;
+    border-radius:20px;
+    padding:6px 14px;
+    font-size:0.85rem;
+    font-weight:600;
+    color:#334155;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:0.4rem;
+    transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow:0 2px 4px rgba(0,0,0,0.03);
+  }
+  .prompt-chip.c-blue { border-color:#93c5fd; background:#eff6ff; color:#1d4ed8; }
+  .prompt-chip.c-blue:hover { background:#dbeafe; transform:translateY(-2px); box-shadow:0 4px 10px rgba(59, 130, 246, 0.2); }
+  .prompt-chip.c-amber { border-color:#fcd34d; background:#fffbeb; color:#b45309; }
+  .prompt-chip.c-amber:hover { background:#fef3c7; transform:translateY(-2px); box-shadow:0 4px 10px rgba(245, 158, 11, 0.2); }
+  .prompt-chip.c-purple { border-color:#d8b4fe; background:#faf5ff; color:#7e22ce; }
+  .prompt-chip.c-purple:hover { background:#f3e8ff; transform:translateY(-2px); box-shadow:0 4px 10px rgba(168, 85, 247, 0.2); }
+  .prompt-chip.c-emerald { border-color:#6ee7b7; background:#ecfdf5; color:#047857; }
+  .prompt-chip.c-emerald:hover { background:#d1fae5; transform:translateY(-2px); box-shadow:0 4px 10px rgba(16, 185, 129, 0.2); }
+  .prompt-chip.c-rose { border-color:#fda4af; background:#fff1f2; color:#be123c; }
+  .prompt-chip.c-rose:hover { background:#ffe4e6; transform:translateY(-2px); box-shadow:0 4px 10px rgba(244, 63, 94, 0.2); }
+
+  form {
+    display:flex;
+    gap:0.6rem;
+    padding:1rem 1.4rem;
+    border-top:1px solid var(--border);
+    background:#ffffff;
+    align-items:center;
+    box-shadow:0 -4px 16px rgba(0,0,0,0.02);
+  }
+  input {
+    flex:1;
+    padding:0.85rem 1.2rem;
+    border:2px solid #e2e8f0;
+    border-radius:12px;
+    font-size:1rem;
+    outline:none;
+    transition:border-color 0.2s, box-shadow 0.2s;
+    background:#f8fafc;
+  }
+  input:focus {
+    background:#ffffff;
+    border-color:#0284c7;
+    box-shadow:0 0 0 3px rgba(2, 132, 199, 0.15);
+  }
+  button[type="submit"] {
+    padding:0.85rem 1.4rem;
+    border:none;
+    border-radius:12px;
+    background:linear-gradient(135deg, #0284c7, #0369a1);
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+    transition:all 0.2s;
+    box-shadow:0 3px 8px rgba(2, 132, 199, 0.3);
+  }
+  button[type="submit"]:hover {
+    background:linear-gradient(135deg, #0369a1, #075985);
+    transform:translateY(-1px);
+  }
+  
+  /* Voice recording button */
+  .rec-btn {
+    background:linear-gradient(135deg, #ef4444, #dc2626);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:0.35rem;
+    padding:0.85rem 1.25rem;
+    border-radius:12px;
+    border:none;
+    font-weight:700;
+    cursor:pointer;
+    box-shadow:0 3px 8px rgba(220, 38, 38, 0.3);
+    transition:all 0.2s;
+  }
+  .rec-btn:hover { background:linear-gradient(135deg, #dc2626, #b91c1c); transform:translateY(-1px); }
+  .rec-btn.recording {
+    background:linear-gradient(135deg, #b91c1c, #991b1b);
+    animation: pulse 1s infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: scale(0.97); box-shadow:0 0 0 0 rgba(220, 38, 38, 0.6); }
+    to { transform: scale(1.03); box-shadow:0 0 0 8px rgba(220, 38, 38, 0); }
+  }
+
+  /* Audio playback pill */
+  .audio-pill {
+    display:inline-flex;
+    align-items:center;
+    gap:0.4rem;
+    margin-top:0.6rem;
+    font-size:0.85rem;
+    background:linear-gradient(135deg, #fef3c7, #fde68a);
+    color:#92400e;
+    border:1px solid #f59e0b;
+    border-radius:20px;
+    padding:4px 12px;
+    cursor:pointer;
+    font-weight:700;
+    box-shadow:0 2px 4px rgba(245, 158, 11, 0.15);
+    transition:all 0.15s;
+  }
+  .audio-pill:hover { background:#fde68a; transform:scale(1.02); }
+
+  /* --- A2UI component styles (Card, Column, Row, Text, Divider, List, Image, Icon) --- */
+  .a2card {
+    border:1.5px solid #cbd5e1;
+    border-radius:16px;
+    padding:1.25rem;
+    background:linear-gradient(135deg, #ffffff 0%, #fefce8 100%);
+    box-shadow:0 6px 18px rgba(0,0,0,0.06);
+    max-width:100%;
+    border-top:4px solid #f59e0b;
+  }
+  .a2card + .a2card, .a2col > .a2card { margin-top:.7rem; }
+  .a2col { display:flex; flex-direction:column; gap:.5rem; }
+  .a2row { display:flex; flex-direction:row; gap:.7rem; align-items:center; flex-wrap:wrap; }
+  .a2row.between { justify-content:space-between; }
+  .a2text { margin:0; line-height:1.45; }
+  .a2text.a2-h1 { font-size:1.55rem; font-weight:800; color:#1e1b4b; }
+  .a2text.a2-h2 { font-size:1.3rem; font-weight:700; color:#0369a1; }
+  .a2text.a2-h3 { font-size:1.15rem; font-weight:700; color:#b45309; }
+  .a2text.a2-h4 { font-size:1.05rem; font-weight:600; color:#334155; }
+  .a2text.a2-caption { font-size:.85rem; color:#64748b; font-style:italic; }
+  .a2divider { border:none; border-top:1.5px dashed #cbd5e1; margin:.6rem 0; width:100%; }
+  .a2img { max-width:100%; border-radius:12px; display:block; box-shadow:0 4px 12px rgba(0,0,0,0.1); border:2px solid #fff; }
+  .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-size:1.35rem; line-height:1; vertical-align:middle; color:#0284c7; }
+</style>
+</head>
+<body>
+<div class="bavarian-ribbon"></div>
+<header>
+  <div class="logo-title">🥨 <span>DeutschBuddy</span> <span style="font-size:0.9rem; font-weight:normal; opacity:0.85;">🍻</span></div>
+  <div class="logo-tagline">Dein KI-Sprachpartner & Tutor</div>
+</header>
+<div id="log"></div>
+
+<div class="quick-prompts">
+  <button type="button" class="prompt-chip c-blue" data-prompt="Hallo! Ich möchte mein Deutsch auf B1-Niveau üben. Worüber können wir sprechen?">💬 Freies Gespräch (B1)</button>
+  <button type="button" class="prompt-chip c-amber" data-prompt="Erstelle eine Bildbeschreibung für eine traditionelle deutsche Bäckerei mit Brezeln!">🥨 Bildbeschreibung (Bäckerei)</button>
+  <button type="button" class="prompt-chip c-purple" data-prompt="Kannst du mir den Unterschied zwischen 'weil' und 'denn' mit Beispielen erklären?">📖 Grammatik-Tipp</button>
+  <button type="button" class="prompt-chip c-emerald" data-prompt="Schau bitte in mein Profil und zeige mir meine typischen Grammatikfehler!">🧠 Meine Fehler ansehen</button>
+  <button type="button" class="prompt-chip c-rose" data-prompt="Was bedeutet das Wort 'Gemütlichkeit' oder 'Feierabend' im Wörterbuch?">📚 Wörterbuch (Kulturwörter)</button>
+</div>
+
+<form id="form">
+  <input id="input" placeholder="Type or click the microphone to speak German…" autocomplete="off" autofocus>
+  <button type="button" id="recBtn" class="rec-btn" title="Click to record your voice in German">🎙️ <span id="recText">Sprich</span></button>
+  <button type="submit">Send</button>
+</form>
+
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const recBtn = document.getElementById("recBtn");
+const recText = document.getElementById("recText");
+
+// German Speech Recognition Setup
+let recognition = null;
+let isRecording = false;
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRec();
+  recognition.lang = 'de-DE';
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    recBtn.classList.add('recording');
+    recText.textContent = "Höre zu...";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    input.value = transcript;
+    recBtn.classList.remove('recording');
+    recText.textContent = "Sprich";
+    isRecording = false;
+  };
+
+  recognition.onerror = (e) => {
+    console.warn("Speech recognition error:", e);
+    recBtn.classList.remove('recording');
+    recText.textContent = "Sprich";
+    isRecording = false;
+  };
+
+  recognition.onend = () => {
+    recBtn.classList.remove('recording');
+    recText.textContent = "Sprich";
+    isRecording = false;
+  };
+
+  recBtn.addEventListener('click', () => {
+    if (isRecording) {
+      recognition.stop();
+    } else {
+      try {
+        recognition.start();
+      } catch (err) {
+        console.warn("Recognition start err:", err);
+      }
+    }
+  });
+} else {
+  if (recBtn) recBtn.style.display = "none";
+}
+
+// Quick prompt click handler
+document.querySelectorAll(".prompt-chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    input.value = chip.getAttribute("data-prompt");
+    form.dispatchEvent(new Event("submit"));
+  });
+});
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function bubble(who) {
+  const row = el("div", "msg-row " + who);
+  const avatar = el("div", "avatar", who === "user" ? "👤" : "🥨");
+  const b = el("div", "bubble");
+  row.appendChild(avatar);
+  row.appendChild(b);
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+  return b;
+}
+
+function formatMarkdownText(str) {
+  if (!str) return "";
+  const div = document.createElement("div");
+  div.textContent = str;
+  let escaped = div.innerHTML;
+  // Convert **bold** to <strong>
+  escaped = escaped.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  // Convert *italic* to <em>
+  escaped = escaped.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  // Convert newlines to <br>
+  escaped = escaped.replace(/\n/g, "<br>");
+  return escaped;
+}
+
+function speakText(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'de-DE';
+  utterance.rate = 0.95;
+  const voices = window.speechSynthesis.getVoices();
+  const deVoice = voices.find(v => v.lang.startsWith('de') && !v.localService) || voices.find(v => v.lang.startsWith('de'));
+  if (deVoice) utterance.voice = deVoice;
+  window.speechSynthesis.speak(utterance);
+}
+
+// ---------------------------------------------------------------------------
+// A2UI renderer
+// ---------------------------------------------------------------------------
+function renderSurface(surface, parent) {
+  const compMap = new Map();
+  for (const c of (surface.components || [])) compMap.set(c.id, c.component);
+  const root = compMap.get(surface.rootId);
+  if (!root) {
+    parent.appendChild(el("div", "a2text", JSON.stringify(surface, null, 2)));
+    return;
+  }
+  parent.appendChild(renderComp(root, compMap));
+}
+
+function renderComp(c, map) {
+  const kind = Object.keys(c || {})[0];
+  const props = c[kind] || {};
+  switch (kind) {
+    case "Card": {
+      const card = el("div", "a2card");
+      if (props.child) {
+        const ch = map.get(props.child);
+        if (ch) card.appendChild(renderComp(ch, map));
+      }
+      return card;
+    }
+    case "Column": {
+      const col = el("div", "a2col");
+      for (const id of (props.children?.ids || [])) {
+        const ch = map.get(id);
+        if (ch) col.appendChild(renderComp(ch, map));
+      }
+      return col;
+    }
+    case "Row": {
+      const row = el("div", "a2row");
+      if (props.distribution === "space-between") row.classList.add("between");
+      for (const id of (props.children?.ids || [])) {
+        const ch = map.get(id);
+        if (ch) row.appendChild(renderComp(ch, map));
+      }
+      return row;
+    }
+    case "Text": {
+      const hint = (props.usageHint || "body").toLowerCase();
+      const t = el("p", "a2text a2-" + hint);
+      t.textContent = props.text?.literalString ?? "";
+      return t;
+    }
+    case "Divider": return el("hr", "a2divider");
+    case "List": {
+      const list = el("div", "a2col");
+      for (const id of (props.children?.ids || [])) {
+        const ch = map.get(id);
+        if (ch) list.appendChild(renderComp(ch, map));
+      }
+      return list;
+    }
+    case "Image": {
+      const img = el("img", "a2img");
+      const url = props.url?.literalString;
+      if (url) img.src = url;
+      img.alt = "";
+      return img;
+    }
+    case "Icon": {
+      const span = el("span", "material-symbols-outlined");
+      span.textContent = props.name?.literalString || "info";
+      return span;
+    }
+    default:
+      return el("div", "a2text", JSON.stringify(c));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chat submit flow
+// ---------------------------------------------------------------------------
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+
+  bubble("user").textContent = text;
+  const reply = bubble("bot");
+  reply.textContent = "…";
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ("HTTP " + res.status));
+
+    reply.textContent = "";
+    const parts = (data.parts && data.parts.length) ? data.parts : [{ kind: "text", text: "(The agent didn't return a reply.)" }];
+    let spokenText = "";
+
+    for (const p of parts) {
+      const partType = p.kind || p.type;
+      if (partType === "text") {
+        const rawText = p.text || "";
+        const div = el("div");
+        
+        // Simple markdown parsing for images: ![alt](url)
+        const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+        if (imgRegex.test(rawText)) {
+          let lastIndex = 0;
+          let match;
+          const re = /!\[([^\]]*)\]\(([^)]+)\)/g;
+          while ((match = re.exec(rawText)) !== null) {
+            const before = rawText.slice(lastIndex, match.index);
+            if (before) {
+              const span = el("span");
+              span.innerHTML = formatMarkdownText(before);
+              div.appendChild(span);
+            }
+            const img = el("img", "a2img");
+            img.src = match[2];
+            img.alt = match[1] || "Bild";
+            img.style.margin = "0.6rem 0";
+            img.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+            img.style.borderRadius = "12px";
+            div.appendChild(img);
+            lastIndex = re.lastIndex;
+          }
+          const after = rawText.slice(lastIndex);
+          if (after) {
+            const span = el("span");
+            span.innerHTML = formatMarkdownText(after);
+            div.appendChild(span);
+          }
+        } else {
+          div.innerHTML = formatMarkdownText(rawText);
+        }
+
+        reply.appendChild(div);
+        spokenText += rawText.replace(/!\[[^\]]*\]\([^)]+\)/g, "") + " ";
+      } else if (partType === "a2ui") {
+        reply.classList.add("rich");
+        const a2data = Array.isArray(p.data) ? p.data : [p.data];
+        for (const msg of a2data) {
+          if (msg && msg.surfaceUpdate) renderSurface(msg.surfaceUpdate, reply);
+        }
+      }
+    }
+
+    // Add speech playback button for bot response
+    if (spokenText.trim()) {
+      const audioBtn = el("div", "audio-pill", "🔊 Anhören");
+      audioBtn.addEventListener("click", () => speakText(spokenText));
+      reply.appendChild(audioBtn);
+      speakText(spokenText);
+    }
+
+  } catch (err) {
+    reply.textContent = "Error: " + err.message;
+  }
+  log.scrollTop = log.scrollHeight;
+});
+</script>
+</body>
+</html>
